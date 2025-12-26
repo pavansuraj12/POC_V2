@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Hen Detection – CCTV Mode</title>
+<title>Hen Detection – Stable</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -61,11 +61,9 @@ button {
 
 <script>
 /* ================= CONFIG ================= */
-const WS_URL = "wss://unraided-camren-streamingly.ngrok-free.dev";
-
-// 🔥 IMPORTANT: detection FPS (lower = smoother on ngrok)
-const DETECTION_FPS = 5;          // try 3–6 on ngrok
-const MODEL_INPUT_SIZE = 640;     // reduce payload
+// 🔴 UPDATE THIS EVERY TIME ngrok restarts
+const WS_URL = "wss://YOUR_NGROK_ID.ngrok-free.dev";
+const MODEL_INPUT_SIZE = 640;
 
 /* ================= GLOBALS ================= */
 const video = document.getElementById("video");
@@ -75,9 +73,8 @@ const fpsLabel = document.getElementById("fps");
 
 let socket;
 let detections = [];
-let lastRenderTime = performance.now();
-let lastDetectTime = 0;
 let videoW = 0, videoH = 0;
+let lastTime = performance.now();
 let started = false;
 
 /* ================= START ================= */
@@ -102,7 +99,7 @@ async function startCamera() {
     videoH = video.videoHeight;
     canvas.width = videoW;
     canvas.height = videoH;
-    requestAnimationFrame(renderLoop);
+    requestAnimationFrame(loop);
   };
 }
 
@@ -114,26 +111,28 @@ function startWebSocket() {
   };
 }
 
-/* ================= SEND FRAME (RATE LIMITED) ================= */
-function sendFrame(now) {
+/* ================= SEND FRAME ================= */
+function sendFrame() {
   if (!socket || socket.readyState !== 1) return;
-  if (now - lastDetectTime < 1000 / DETECTION_FPS) return;
-
-  lastDetectTime = now;
 
   const tmp = document.createElement("canvas");
   tmp.width = MODEL_INPUT_SIZE;
   tmp.height = MODEL_INPUT_SIZE;
 
-  tmp.getContext("2d").drawImage(video, 0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+  tmp.getContext("2d").drawImage(
+    video,
+    0, 0,
+    MODEL_INPUT_SIZE,
+    MODEL_INPUT_SIZE
+  );
 
   socket.send(JSON.stringify({
-    frame: tmp.toDataURL("image/jpeg", 0.6).split(",")[1]
+    frame: tmp.toDataURL("image/jpeg", 0.7).split(",")[1]
   }));
 }
 
-/* ================= RENDER LOOP ================= */
-function renderLoop(now) {
+/* ================= LOOP ================= */
+function loop(now) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const sx = canvas.width / MODEL_INPUT_SIZE;
@@ -150,13 +149,14 @@ function renderLoop(now) {
     );
   });
 
-  const fps = Math.round(1000 / (now - lastRenderTime));
-  lastRenderTime = now;
+  const fps = Math.round(1000 / (now - lastTime));
+  lastTime = now;
   fpsLabel.innerText = `FPS: ${fps}`;
 
-  sendFrame(now);
-  requestAnimationFrame(renderLoop);
+  sendFrame();
+  requestAnimationFrame(loop);
 }
 </script>
+
 </body>
 </html>
