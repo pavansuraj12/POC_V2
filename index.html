@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hen Detection – Max Accuracy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body {
+  margin: 0;
+  background: black;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+#container { position: relative; }
+video, canvas {
+  position: absolute;
+  top: 0; left: 0;
+}
+canvas { pointer-events: none; }
+#fps {
+  position: absolute;
+  top: 8px; left: 8px;
+  color: #0f0;
+  font-family: monospace;
+  background: rgba(0,0,0,0.5);
+  padding: 4px;
+}
+</style>
+</head>
+
+<body>
+<div id="container">
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="canvas"></canvas>
+  <div id="fps">FPS: --</div>
+</div>
+
+<script>
+/* ===== ACCURACY CONFIG ===== */
+const WS_URL = "ws://localhost:8000";
+const MODEL_INPUT_SIZE = 960;     // must match backend
+
+const SEND_EVERY_N_FRAMES = 1;    // send every frame
+
+/* ===== GLOBALS ===== */
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const fpsLabel = document.getElementById("fps");
+
+let socket;
+let detections = [];
+let videoW = 0, videoH = 0;
+let lastTime = performance.now();
+
+/* ===== CAMERA ===== */
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  video.srcObject = stream;
+
+  video.onloadedmetadata = () => {
+    videoW = video.videoWidth;
+    videoH = video.videoHeight;
+    video.width = videoW;
+    video.height = videoH;
+    canvas.width = videoW;
+    canvas.height = videoH;
+    requestAnimationFrame(renderLoop);
+  };
+}
+
+/* ===== WEBSOCKET ===== */
+function startWebSocket() {
+  socket = new WebSocket(WS_URL);
+  socket.onmessage = e => {
+    detections = JSON.parse(e.data).detections || [];
+  };
+}
+
+/* ===== SEND FRAME ===== */
+function sendFrame() {
+  if (!socket || socket.readyState !== 1) return;
+
+  const tmp = document.createElement("canvas");
+  tmp.width = MODEL_INPUT_SIZE;
+  tmp.height = MODEL_INPUT_SIZE;
+  tmp.getContext("2d").drawImage(video, 0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+
+  socket.send(JSON.stringify({
+    frame: tmp.toDataURL("image/jpeg", 0.7).split(",")[1]
+  }));
+}
+
+/* ===== RENDER LOOP ===== */
+function renderLoop(now) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const sx = videoW / MODEL_INPUT_SIZE;
+  const sy = videoH / MODEL_INPUT_SIZE;
+
+  detections.forEach(d => {
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(
+      d.x1 * sx,
+      d.y1 * sy,
+      (d.x2 - d.x1) * sx,
+      (d.y2 - d.y1) * sy
+    );
+  });
+
+  const fps = Math.round(1000 / (now - lastTime));
+  lastTime = now;
+  fpsLabel.innerText = `FPS: ${fps}`;
+
+  sendFrame();
+  requestAnimationFrame(renderLoop);
+}
+
+/* ===== START ===== */
+startCamera();
+startWebSocket();
+</script>
+</body>
+</html>
