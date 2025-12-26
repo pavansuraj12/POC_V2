@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Hen Detection – Max Accuracy</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
 body {
   margin: 0;
@@ -16,12 +17,14 @@ body {
 #container { position: relative; }
 video, canvas {
   position: absolute;
-  top: 0; left: 0;
+  top: 0;
+  left: 0;
 }
 canvas { pointer-events: none; }
 #fps {
   position: absolute;
-  top: 8px; left: 8px;
+  top: 8px;
+  left: 8px;
   color: #0f0;
   font-family: monospace;
   background: rgba(0,0,0,0.5);
@@ -38,13 +41,12 @@ canvas { pointer-events: none; }
 </div>
 
 <script>
-/* ===== ACCURACY CONFIG ===== */
-const WS_URL = "ws://localhost:8000";
-const MODEL_INPUT_SIZE = 960;     // must match backend
+/* ================= CONFIG ================= */
+// ✅ ngrok WSS URL (UPDATE IF ngrok changes)
+const WS_URL = "wss://unraided-camren-streamingly.ngrok-free.dev";
+const MODEL_INPUT_SIZE = 960;
 
-const SEND_EVERY_N_FRAMES = 1;    // send every frame
-
-/* ===== GLOBALS ===== */
+/* ================= GLOBALS ================= */
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -52,48 +54,73 @@ const fpsLabel = document.getElementById("fps");
 
 let socket;
 let detections = [];
-let videoW = 0, videoH = 0;
+let videoW = 0;
+let videoH = 0;
 let lastTime = performance.now();
 
-/* ===== CAMERA ===== */
+/* ================= CAMERA (BACK CAMERA) ================= */
 async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: { ideal: "environment" }   // ✅ back camera on mobile
+    },
+    audio: false
+  });
+
   video.srcObject = stream;
 
   video.onloadedmetadata = () => {
     videoW = video.videoWidth;
     videoH = video.videoHeight;
+
     video.width = videoW;
     video.height = videoH;
     canvas.width = videoW;
     canvas.height = videoH;
+
     requestAnimationFrame(renderLoop);
   };
 }
 
-/* ===== WEBSOCKET ===== */
+/* ================= WEBSOCKET ================= */
 function startWebSocket() {
   socket = new WebSocket(WS_URL);
+
+  socket.onopen = () => {
+    console.log("WebSocket connected");
+  };
+
+  socket.onerror = err => {
+    console.error("WebSocket error:", err);
+  };
+
   socket.onmessage = e => {
-    detections = JSON.parse(e.data).detections || [];
+    const data = JSON.parse(e.data);
+    detections = data.detections || [];
   };
 }
 
-/* ===== SEND FRAME ===== */
+/* ================= SEND FRAME ================= */
 function sendFrame() {
   if (!socket || socket.readyState !== 1) return;
 
   const tmp = document.createElement("canvas");
   tmp.width = MODEL_INPUT_SIZE;
   tmp.height = MODEL_INPUT_SIZE;
-  tmp.getContext("2d").drawImage(video, 0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE);
+
+  tmp.getContext("2d").drawImage(
+    video,
+    0, 0,
+    MODEL_INPUT_SIZE,
+    MODEL_INPUT_SIZE
+  );
 
   socket.send(JSON.stringify({
     frame: tmp.toDataURL("image/jpeg", 0.7).split(",")[1]
   }));
 }
 
-/* ===== RENDER LOOP ===== */
+/* ================= RENDER LOOP ================= */
 function renderLoop(now) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -119,7 +146,7 @@ function renderLoop(now) {
   requestAnimationFrame(renderLoop);
 }
 
-/* ===== START ===== */
+/* ================= START ================= */
 startCamera();
 startWebSocket();
 </script>
