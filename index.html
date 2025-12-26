@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Hen Detection – Max Accuracy</title>
+<title>Hen Detection – Stable</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -41,12 +41,11 @@ canvas { pointer-events: none; }
 </div>
 
 <script>
-/* ================= CONFIG ================= */
-// ✅ ngrok WSS URL (UPDATE IF ngrok changes)
+/* ===== CONFIG ===== */
 const WS_URL = "wss://unraided-camren-streamingly.ngrok-free.dev";
 const MODEL_INPUT_SIZE = 960;
 
-/* ================= GLOBALS ================= */
+/* ===== GLOBALS ===== */
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -54,15 +53,14 @@ const fpsLabel = document.getElementById("fps");
 
 let socket;
 let detections = [];
-let videoW = 0;
-let videoH = 0;
+let videoW = 0, videoH = 0;
 let lastTime = performance.now();
 
-/* ================= CAMERA (BACK CAMERA) ================= */
+/* ===== CAMERA (SAFE & STABLE) ===== */
 async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: {
-      facingMode: { ideal: "environment" }   // ✅ back camera on mobile
+      facingMode: { ideal: "environment" } // hint, not force
     },
     audio: false
   });
@@ -82,25 +80,16 @@ async function startCamera() {
   };
 }
 
-/* ================= WEBSOCKET ================= */
+/* ===== WEBSOCKET ===== */
 function startWebSocket() {
   socket = new WebSocket(WS_URL);
 
-  socket.onopen = () => {
-    console.log("WebSocket connected");
-  };
-
-  socket.onerror = err => {
-    console.error("WebSocket error:", err);
-  };
-
   socket.onmessage = e => {
-    const data = JSON.parse(e.data);
-    detections = data.detections || [];
+    detections = JSON.parse(e.data).detections || [];
   };
 }
 
-/* ================= SEND FRAME ================= */
+/* ===== SEND FRAME (SIMPLE RESIZE – STABLE) ===== */
 function sendFrame() {
   if (!socket || socket.readyState !== 1) return;
 
@@ -120,7 +109,7 @@ function sendFrame() {
   }));
 }
 
-/* ================= RENDER LOOP ================= */
+/* ===== RENDER LOOP ===== */
 function renderLoop(now) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -146,7 +135,7 @@ function renderLoop(now) {
   requestAnimationFrame(renderLoop);
 }
 
-/* ================= START ================= */
+/* ===== START ===== */
 startCamera();
 startWebSocket();
 </script>
