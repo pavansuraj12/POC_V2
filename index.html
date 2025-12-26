@@ -14,17 +14,13 @@ body {
   align-items: center;
   height: 100vh;
 }
-#container {
-  position: relative;
-}
+#container { position: relative; }
 video, canvas {
   position: absolute;
   top: 0;
   left: 0;
 }
-canvas {
-  pointer-events: none;
-}
+canvas { pointer-events: none; }
 #fps {
   position: absolute;
   top: 8px;
@@ -32,8 +28,7 @@ canvas {
   color: #0f0;
   font-family: monospace;
   background: rgba(0,0,0,0.5);
-  padding: 4px 6px;
-  font-size: 14px;
+  padding: 4px;
 }
 </style>
 </head>
@@ -47,7 +42,7 @@ canvas {
 
 <script>
 /* ================= CONFIG ================= */
-// 🔴 UPDATE if ngrok URL changes
+// ✅ ngrok WSS URL (UPDATE IF ngrok changes)
 const WS_URL = "wss://unraided-camren-streamingly.ngrok-free.dev";
 const MODEL_INPUT_SIZE = 960;
 
@@ -63,13 +58,11 @@ let videoW = 0;
 let videoH = 0;
 let lastTime = performance.now();
 
-/* ================= CAMERA ================= */
+/* ================= CAMERA (BACK CAMERA) ================= */
 async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: {
-      facingMode: { exact: "environment" }, // force back camera
-      width: { ideal: 1280 },
-      height: { ideal: 720 }
+      facingMode: { ideal: "environment" }   // ✅ back camera on mobile
     },
     audio: false
   });
@@ -107,24 +100,19 @@ function startWebSocket() {
   };
 }
 
-/* ================= SEND FRAME (CENTER CROP) ================= */
+/* ================= SEND FRAME ================= */
 function sendFrame() {
   if (!socket || socket.readyState !== 1) return;
 
   const tmp = document.createElement("canvas");
   tmp.width = MODEL_INPUT_SIZE;
   tmp.height = MODEL_INPUT_SIZE;
-  const tctx = tmp.getContext("2d");
 
-  const size = Math.min(videoW, videoH);
-  const sx = (videoW - size) / 2;
-  const sy = (videoH - size) / 2;
-
-  // center crop → square → resize
-  tctx.drawImage(
+  tmp.getContext("2d").drawImage(
     video,
-    sx, sy, size, size,
-    0, 0, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE
+    0, 0,
+    MODEL_INPUT_SIZE,
+    MODEL_INPUT_SIZE
   );
 
   socket.send(JSON.stringify({
@@ -136,19 +124,17 @@ function sendFrame() {
 function renderLoop(now) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const size = Math.min(videoW, videoH);
-  const offsetX = (videoW - size) / 2;
-  const offsetY = (videoH - size) / 2;
-  const scale = size / MODEL_INPUT_SIZE;
+  const sx = videoW / MODEL_INPUT_SIZE;
+  const sy = videoH / MODEL_INPUT_SIZE;
 
   detections.forEach(d => {
     ctx.strokeStyle = "lime";
     ctx.lineWidth = 2;
     ctx.strokeRect(
-      d.x1 * scale + offsetX,
-      d.y1 * scale + offsetY,
-      (d.x2 - d.x1) * scale,
-      (d.y2 - d.y1) * scale
+      d.x1 * sx,
+      d.y1 * sy,
+      (d.x2 - d.x1) * sx,
+      (d.y2 - d.y1) * sy
     );
   });
 
